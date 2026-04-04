@@ -3,6 +3,15 @@ import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
+// If NEXTAUTH_URL isn't provided (e.g. not set in deployment env),
+// try to derive it from VERCEL_URL so auth callbacks/cookies work.
+if (!process.env.NEXTAUTH_URL && process.env.VERCEL_URL) {
+  const v = process.env.VERCEL_URL.startsWith("http")
+    ? process.env.VERCEL_URL
+    : `https://${process.env.VERCEL_URL}`;
+  process.env.NEXTAUTH_URL = v;
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
   pages: { signIn: "/login" },
@@ -37,7 +46,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const email = String(credentials.email).toLowerCase().trim();
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) return null;
-        const ok = await compare(String(credentials.password), user.passwordHash);
+        const ok = await compare(
+          String(credentials.password),
+          user.passwordHash,
+        );
         if (!ok) return null;
         return { id: user.id, name: user.name, email: user.email };
       },
