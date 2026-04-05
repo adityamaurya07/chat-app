@@ -4,6 +4,11 @@ import { signOut } from "next-auth/react";
 import { io, type Socket } from "socket.io-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+/** Vercel has no Socket.IO server — set NEXT_PUBLIC_SOCKET_DISABLED=true to stop /socket.io 404s. */
+const SOCKET_DISABLED = process.env.NEXT_PUBLIC_SOCKET_DISABLED === "true";
+const SOCKET_BASE_URL =
+  process.env.NEXT_PUBLIC_SOCKET_URL?.replace(/\/$/, "") ?? "";
+
 export type ChatMessage = {
   id: string;
   userId: string;
@@ -212,14 +217,44 @@ export function ChatRoom({ userId, userName }: { userId: string; userName: strin
   }, [selectedPeerId, selectedPeer?.relation]);
 
   useEffect(() => {
+    if (
+      !SOCKET_DISABLED ||
+      !selectedPeerId ||
+      selectedPeer?.relation !== "friends"
+    ) {
+      return;
+    }
+    const poll = () => {
+      void fetch(
+        `/api/messages?peerId=${encodeURIComponent(selectedPeerId)}`,
+      ).then(async (res) => {
+        if (!res.ok) return;
+        const data = (await res.json()) as ChatMessage[];
+        setMessages(data);
+      });
+    };
+    const id = setInterval(poll, 5000);
+    return () => clearInterval(id);
+  }, [SOCKET_DISABLED, selectedPeerId, selectedPeer?.relation]);
+
+  useEffect(() => {
     listEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, peerTyping]);
 
   useEffect(() => {
-    const socket = io({
-      path: "/socket.io/",
+    if (SOCKET_DISABLED) {
+      socketRef.current = null;
+      setConnected(false);
+      return;
+    }
+
+    const socketOptions = {
+      path: "/socket.io/" as const,
       withCredentials: true,
-    });
+    };
+    const socket = SOCKET_BASE_URL
+      ? io(SOCKET_BASE_URL, socketOptions)
+      : io(socketOptions);
     socketRef.current = socket;
 
     socket.on("connect", () => setConnected(true));
@@ -363,14 +398,31 @@ export function ChatRoom({ userId, userName }: { userId: string; userName: strin
     setVcError(null);
   }
 
-  function sendChat(e: React.FormEvent) {
+  async function sendChat(e: React.FormEvent) {
     e.preventDefault();
     const t = input.trim();
-    if (!t || !socketRef.current || !selectedPeerId) return;
+    if (!t || !selectedPeerId) return;
     emitTyping(false);
     if (typingStopRef.current) clearTimeout(typingStopRef.current);
-    socketRef.current.emit("chat:send", { peerId: selectedPeerId, content: t });
-    setInput("");
+
+    if (!SOCKET_DISABLED && socketRef.current?.connected) {
+      socketRef.current.emit("chat:send", { peerId: selectedPeerId, content: t });
+      setInput("");
+      return;
+    }
+
+    if (SOCKET_DISABLED) {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ peerId: selectedPeerId, content: t }),
+      });
+      if (res.ok) {
+        const msg = (await res.json()) as ChatMessage;
+        setMessages((m) => [...m, msg]);
+      }
+      setInput("");
+    }
   }
 
   function selectUser(u: DirectoryUser) {
@@ -393,8 +445,20 @@ export function ChatRoom({ userId, userName }: { userId: string; userName: strin
           <p className="text-xs text-zinc-500">
             Signed in as <span className="font-medium text-zinc-700 dark:text-zinc-300">{userName}</span>
             {" · "}
-            <span className={connected ? "text-emerald-600" : "text-amber-600"}>
-              {connected ? "Live" : "Connecting…"}
+            <span
+              className={
+                SOCKET_DISABLED
+                  ? "text-zinc-500"
+                  : connected
+                    ? "text-emerald-600"
+                    : "text-amber-600"
+              }
+            >
+              {SOCKET_DISABLED
+                ? "Realtime off · HTTP chat (poll every 5s)"
+                : connected
+                  ? "Live"
+                  : "Connecting realtime…"}
             </span>
           </p>
         </div>
@@ -573,7 +637,7 @@ export function ChatRoom({ userId, userName }: { userId: string; userName: strin
             />
             <button
               type="submit"
-              disabled={!connected || !canChat}
+              disabled={(!SOCKET_DISABLED && !connected) || !canChat}
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               Send
@@ -584,6 +648,11 @@ export function ChatRoom({ userId, userName }: { userId: string; userName: strin
         <section className="flex w-full flex-col gap-3 border-t border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 lg:w-80 lg:border-l lg:border-t-0 xl:w-96">
           <h2 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Voice / video</h2>
           <p className="text-xs text-zinc-500">1:1 call with your selected friend (WebRTC + STUN).</p>
+          {SOCKET_DISABLED ? (
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              Calls need the Socket.IO server (not available in this deployment mode).
+            </p>
+          ) : null}
           {!canChat ? (
             <p className="text-xs text-amber-700 dark:text-amber-300">Select a friend to enable calls.</p>
           ) : null}
@@ -597,7 +666,7 @@ export function ChatRoom({ userId, userName }: { userId: string; userName: strin
               <button
                 type="button"
                 onClick={() => void joinVc()}
-                disabled={!connected || !canChat}
+                disabled={SOCKET_DISABLED || !connected || !canChat}
                 className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
                 Join call

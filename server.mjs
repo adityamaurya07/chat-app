@@ -88,7 +88,14 @@ const httpServer = createServer((req, res) => {
 const io = new Server(httpServer, {
   path: "/socket.io/",
   cors: {
-    origin: dev ? true : `http://${hostname}:${port}`,
+    origin: (() => {
+      if (dev) return true;
+      const raw = process.env.SOCKET_CORS_ORIGIN?.trim();
+      if (raw) {
+        return raw.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+      return `http://${hostname}:${port}`;
+    })(),
     credentials: true,
   },
 });
