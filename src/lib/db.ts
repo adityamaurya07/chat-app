@@ -20,19 +20,19 @@ function normalizeDatabaseUrl(value: string | undefined): string {
 }
 
 export function getMongoUri(): string {
-  const raw = normalizeDatabaseUrl(process.env.DATABASE_URL);
+  const raw = normalizeDatabaseUrl(process.env.DBURL);
   if (!raw) {
     throw new Error(
-      "DATABASE_URL is not set. Use a MongoDB URI, e.g. mongodb://127.0.0.1:27017/chat-app or mongodb+srv://user:pass@cluster.mongodb.net/dbname",
+      "DBURL is not set. Use a MongoDB URI, e.g. mongodb://127.0.0.1:27017/chat-app or mongodb+srv://user:pass@cluster.mongodb.net/dbname",
     );
   }
   if (!raw.startsWith("mongodb://") && !raw.startsWith("mongodb+srv://")) {
     const hint =
       raw.startsWith("file:") || raw.includes("dev.db")
-        ? " This value looks like an old SQLite/Prisma URL. Update DATABASE_URL to MongoDB, and remove any duplicate DATABASE_URL from .env.local or Windows “Environment variables” (they override .env)."
+        ? " This value looks like an old SQLite/Prisma URL. Set DBURL to a MongoDB URI, and remove any duplicate DBURL from .env.local or Windows “Environment variables” (they override .env)."
         : " Use mongodb:// or mongodb+srv:// only.";
     throw new Error(
-      "DATABASE_URL must be a MongoDB connection string (mongodb:// or mongodb+srv://). " +
+      "DBURL must be a MongoDB connection string (mongodb:// or mongodb+srv://). " +
         "SQLite/file URLs are not supported with Mongoose." +
         hint,
     );
@@ -74,7 +74,7 @@ export function jsonDbUnavailable(err: unknown) {
   return Response.json(
     {
       error: "Database unavailable",
-      hint: "MongoDB must be running and DATABASE_URL must point to it. Local: run `docker compose up -d` in this project, or install MongoDB. Cloud: use Atlas and set DATABASE_URL to your mongodb+srv:// connection string.",
+      hint: "MongoDB must be running and DBURL must point to it. Local: run `docker compose up -d` in this project, or install MongoDB. Cloud: use Atlas and set DBURL to your mongodb+srv:// connection string.",
       ...(process.env.NODE_ENV !== "production" ? { details } : {}),
     },
     { status: 503 },

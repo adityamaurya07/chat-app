@@ -7,13 +7,13 @@ import { getToken } from "next-auth/jwt";
 import mongoose from "mongoose";
 
 const mongoUri =
-  process.env.DATABASE_URL?.trim() || "mongodb://127.0.0.1:27017/chat-app";
+  process.env.DBURL?.trim() || "mongodb://127.0.0.1:27017/chat-app";
 if (
   !mongoUri.startsWith("mongodb://") &&
   !mongoUri.startsWith("mongodb+srv://")
 ) {
   console.error(
-    "DATABASE_URL must be a MongoDB URI (mongodb:// or mongodb+srv://). SQLite file URLs are not supported.",
+    "DBURL must be a MongoDB URI (mongodb:// or mongodb+srv://). SQLite file URLs are not supported.",
   );
   process.exit(1);
 }

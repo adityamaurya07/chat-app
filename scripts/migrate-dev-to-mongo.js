@@ -3,7 +3,7 @@
  * scripts/migrate-dev-to-mongo.js
  * Copy data from a local SQLite file into MongoDB using mongoose.
  * Usage:
- *   set DATABASE_URL=mongodb://user:pass@host:27017/dbname
+ *   set DBURL=mongodb://user:pass@host:27017/dbname
  *   node scripts/migrate-dev-to-mongo.js
  *
  * Optional: SQLITE_PATH overrides the SQLite file (default: <project>/dev.db)
@@ -39,7 +39,7 @@ async function main() {
   const sqlite = new SQL.Database(new Uint8Array(fileBuffer));
 
   const mongoUri =
-    process.env.DATABASE_URL || "mongodb://localhost:27017/chat-app";
+    process.env.DBURL || "mongodb://localhost:27017/chat-app";
   await mongoose.connect(mongoUri, { dbName: undefined }).catch((e) => {
     console.error("Mongo connect error", e);
     process.exit(1);

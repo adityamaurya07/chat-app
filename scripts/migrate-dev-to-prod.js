@@ -3,10 +3,10 @@
  * scripts/migrate-dev-to-prod.js
  *
  * Copies data from a local SQLite file into the MongoDB database in
- * process.env.DATABASE_URL.
+ * process.env.DBURL.
  *
  * Usage:
- *   $env:DATABASE_URL="mongodb://..."
+ *   $env:DBURL="mongodb://..."
  *   node scripts/migrate-dev-to-prod.js
  *
  * Optional: $env:SQLITE_PATH="C:\path\to\dev.db" (default: <project>/dev.db)
@@ -32,9 +32,9 @@ async function main() {
     process.env.SQLITE_PATH ||
     path.join(__dirname, "..", "dev.db");
 
-  if (!process.env.DATABASE_URL) {
+  if (!process.env.DBURL) {
     console.error(
-      "Please set DATABASE_URL to your MongoDB connection string before running.",
+      "Please set DBURL to your MongoDB connection string before running.",
     );
     process.exit(1);
   }
@@ -48,7 +48,7 @@ async function main() {
   const fileBuffer = fs.readFileSync(devDbPath);
   const sqlite = new SQL.Database(new Uint8Array(fileBuffer));
 
-  await mongoose.connect(process.env.DATABASE_URL).catch((e) => {
+  await mongoose.connect(process.env.DBURL).catch((e) => {
     console.error("Mongo connect error", e);
     process.exit(1);
   });

@@ -37,18 +37,18 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 ## Production database & deployment notes
 
-- The app uses **MongoDB** via **Mongoose**. Set `DATABASE_URL` to a MongoDB connection string (for example MongoDB Atlas, Railway, or self-hosted).
+- The app uses **MongoDB** via **Mongoose**. Set `DBURL` to a MongoDB connection string (for example MongoDB Atlas, Railway, or self-hosted).
 - Add `AUTH_SECRET` and any other required env vars (for example `NEXTAUTH_URL` for an explicit production origin) in your host’s environment.
 
 Recommended deployment steps:
 
-1. Provision MongoDB and set `DATABASE_URL` and `AUTH_SECRET` in your project environment.
-2. If you have an old **SQLite** export (tables `users`, `friendships`, `messages`), copy it to `dev.db` in the project root (or set `SQLITE_PATH`), then run locally with `DATABASE_URL` pointing at your MongoDB:
+1. Provision MongoDB and set `DBURL` and `AUTH_SECRET` in your project environment.
+2. If you have an old **SQLite** export (tables `users`, `friendships`, `messages`), copy it to `dev.db` in the project root (or set `SQLITE_PATH`), then run locally with `DBURL` pointing at your MongoDB:
 
 ```bash
 npm install
 # PowerShell example:
-# $env:DATABASE_URL="mongodb://..."
+# $env:DBURL="mongodb://..."
 # $env:SQLITE_PATH="C:\path\to\legacy.db"   # optional
 npm run migrate:dev-to-mongo
 # or: node scripts/migrate-dev-to-prod.js
