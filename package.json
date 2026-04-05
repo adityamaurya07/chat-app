@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "cross-env NODE_ENV=production node server.mjs",
     "lint": "eslint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "migrate:dev-to-prod": "node scripts/migrate-dev-to-prod.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
