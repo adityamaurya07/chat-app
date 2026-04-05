@@ -5,7 +5,7 @@ import { io, type Socket } from "socket.io-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /** Vercel has no Socket.IO server — set NEXT_PUBLIC_SOCKET_DISABLED=true to stop /socket.io 404s. */
-const SOCKET_DISABLED = process.env.NEXT_PUBLIC_SOCKET_DISABLED === "false";
+const SOCKET_DISABLED = process.env.NEXT_PUBLIC_SOCKET_DISABLED === "true";
 const SOCKET_BASE_URL =
   process.env.NEXT_PUBLIC_SOCKET_URL?.replace(/\/$/, "") ?? "";
 
@@ -538,8 +538,8 @@ export function ChatRoom({ userId, userName }: { userId: string; userName: strin
                   <li
                     key={u.id}
                     className={`rounded-lg border px-2 py-2 text-sm ${selectedPeerId === u.id
-                        ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30"
-                        : "border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50"
+                      ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30"
+                      : "border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50"
                       }`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -609,8 +609,8 @@ export function ChatRoom({ userId, userName }: { userId: string; userName: strin
                   <li
                     key={m.id}
                     className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${m.userId === userId
-                        ? "ml-auto bg-emerald-600 text-white"
-                        : "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
+                      ? "ml-auto bg-emerald-600 text-white"
+                      : "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
                       }`}
                   >
                     <div className="mb-0.5 text-xs opacity-80">{m.userName}</div>

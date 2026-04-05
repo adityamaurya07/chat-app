@@ -91,6 +91,7 @@ const io = new Server(httpServer, {
     origin: "*",
     credentials: true,
   },
+  transports: ["websocket"],
 });
 
 globalThis.__io = io;
