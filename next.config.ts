@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Use the Node mongoose build in server bundles (avoid browser.umd.js).
+  serverExternalPackages: ["mongoose"],
 };
 
 export default nextConfig;

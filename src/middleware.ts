@@ -1,9 +1,22 @@
-import { auth } from "@/auth";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 
-export default auth((req) => {
+/** Must match `cookies.sessionToken.name` in `src/auth.ts`. */
+const sessionCookieName =
+  process.env.NODE_ENV === "production"
+    ? "__Secure-authjs.session-token"
+    : "authjs.session-token";
+
+export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
-  const isAuthed = !!req.auth;
+  const token = await getToken({
+    req,
+    secret: process.env.AUTH_SECRET,
+    secureCookie: process.env.NODE_ENV === "production",
+    cookieName: sessionCookieName,
+  });
+  const isAuthed = !!token;
 
   if (path.startsWith("/chat") && !isAuthed) {
     const login = new URL("/login", req.nextUrl.origin);
@@ -16,7 +29,7 @@ export default auth((req) => {
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: ["/chat", "/chat/:path*", "/login", "/register"],

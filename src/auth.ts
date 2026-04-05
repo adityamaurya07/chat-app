@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { connectDb, User } from "@/lib/db";
 
 // If NEXTAUTH_URL isn't provided (e.g. not set in deployment env),
 // try to derive it from VERCEL_URL so auth callbacks/cookies work.
@@ -43,15 +43,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
       authorize: async (credentials) => {
         if (!credentials?.email || !credentials?.password) return null;
+        await connectDb();
         const email = String(credentials.email).toLowerCase().trim();
-        const user = await prisma.user.findUnique({ where: { email } });
+        type UserDoc = {
+          _id: string;
+          name?: string;
+          email: string;
+          passwordHash: string;
+        };
+        const user = (await User.findOne({ email }).lean()) as UserDoc | null;
         if (!user) return null;
         const ok = await compare(
           String(credentials.password),
           user.passwordHash,
         );
         if (!ok) return null;
-        return { id: user.id, name: user.name, email: user.email };
+        return {
+          id: String(user._id),
+          name: user.name,
+          email: user.email,
+        };
       },
     }),
   ],
@@ -60,7 +71,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.sub = user.id;
         token.name = user.name;
-        token.email = user.email;
+        token.email = user.email ?? undefined;
       }
       return token;
     },

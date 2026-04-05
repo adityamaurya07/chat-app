@@ -1,18 +1,15 @@
-import type { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { areFriends } from "@/lib/are-friends";
 import { dmRoomId } from "@/lib/dm";
-import { prisma } from "@/lib/prisma";
+import { connectDb, jsonDbUnavailable, Message } from "@/lib/db";
 
-type MessageListRow = Prisma.MessageGetPayload<{
-  select: {
-    id: true;
-    userId: true;
-    userName: true;
-    content: true;
-    createdAt: true;
-  };
-}>;
+type MessageListRow = {
+  id: string;
+  userId: string;
+  userName: string;
+  content: string;
+  createdAt: Date;
+};
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -30,27 +27,35 @@ export async function GET(req: Request) {
     return Response.json({ error: "Invalid peer" }, { status: 400 });
   }
 
+  try {
+    await connectDb();
+  } catch (e) {
+    console.error("MongoDB connection failed:", e);
+    return jsonDbUnavailable(e);
+  }
+
   if (!(await areFriends(me, peerId))) {
     return Response.json({ error: "Not friends" }, { status: 403 });
   }
 
   const roomId = dmRoomId(me, peerId);
 
-  const messages = await prisma.message.findMany({
-    where: { roomId },
-    orderBy: { createdAt: "asc" },
-    take: 200,
-    select: {
-      id: true,
-      userId: true,
-      userName: true,
-      content: true,
-      createdAt: true,
-    },
-  });
+  const docs = await Message.find({ roomId })
+    .sort({ createdAt: 1 })
+    .limit(200)
+    .select({ userId: 1, userName: 1, content: 1, createdAt: 1 })
+    .lean();
+
+  const messages: MessageListRow[] = docs.map((m) => ({
+    id: String(m._id),
+    userId: m.userId,
+    userName: m.userName,
+    content: m.content,
+    createdAt: m.createdAt,
+  }));
 
   return Response.json(
-    messages.map((m: MessageListRow) => ({
+    messages.map((m) => ({
       ...m,
       createdAt: m.createdAt.getTime(),
     })),

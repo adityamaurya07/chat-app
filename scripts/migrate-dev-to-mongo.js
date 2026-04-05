@@ -1,15 +1,12 @@
 #!/usr/bin/env node
 /**
- * scripts/migrate-dev-to-prod.js
- *
- * Copies data from a local SQLite file into the MongoDB database in
- * process.env.DATABASE_URL.
- *
+ * scripts/migrate-dev-to-mongo.js
+ * Copy data from a local SQLite file into MongoDB using mongoose.
  * Usage:
- *   $env:DATABASE_URL="mongodb://..."
- *   node scripts/migrate-dev-to-prod.js
+ *   set DATABASE_URL=mongodb://user:pass@host:27017/dbname
+ *   node scripts/migrate-dev-to-mongo.js
  *
- * Optional: $env:SQLITE_PATH="C:\path\to\dev.db" (default: <project>/dev.db)
+ * Optional: SQLITE_PATH overrides the SQLite file (default: <project>/dev.db)
  */
 
 const fs = require("fs");
@@ -32,13 +29,6 @@ async function main() {
     process.env.SQLITE_PATH ||
     path.join(__dirname, "..", "dev.db");
 
-  if (!process.env.DATABASE_URL) {
-    console.error(
-      "Please set DATABASE_URL to your MongoDB connection string before running.",
-    );
-    process.exit(1);
-  }
-
   if (!fs.existsSync(devDbPath)) {
     console.error("SQLite file not found:", devDbPath);
     process.exit(1);
@@ -48,7 +38,9 @@ async function main() {
   const fileBuffer = fs.readFileSync(devDbPath);
   const sqlite = new SQL.Database(new Uint8Array(fileBuffer));
 
-  await mongoose.connect(process.env.DATABASE_URL).catch((e) => {
+  const mongoUri =
+    process.env.DATABASE_URL || "mongodb://localhost:27017/chat-app";
+  await mongoose.connect(mongoUri, { dbName: undefined }).catch((e) => {
     console.error("Mongo connect error", e);
     process.exit(1);
   });
@@ -91,7 +83,7 @@ async function main() {
   const Message = mongoose.model("Message", messageSchema);
 
   try {
-    console.log("Reading users from SQLite...");
+    console.log("Importing users...");
     const users = allRows(
       sqlite,
       "SELECT id, name, email, password_hash AS passwordHash, created_at AS createdAt FROM users",
@@ -115,7 +107,7 @@ async function main() {
       }
     }
 
-    console.log("Reading friendships from SQLite...");
+    console.log("Importing friendships...");
     const friendships = allRows(
       sqlite,
       "SELECT id, requester_id AS requesterId, addressee_id AS addresseeId, status, created_at AS createdAt, updated_at AS updatedAt FROM friendships",
@@ -140,7 +132,7 @@ async function main() {
       }
     }
 
-    console.log("Reading messages from SQLite...");
+    console.log("Importing messages...");
     const messages = allRows(
       sqlite,
       "SELECT id, room_id AS roomId, user_id AS userId, user_name AS userName, content, created_at AS createdAt FROM messages",
@@ -165,7 +157,7 @@ async function main() {
       }
     }
 
-    console.log("Data migration finished.");
+    console.log("Migration complete");
   } finally {
     sqlite.close();
     await mongoose.disconnect();

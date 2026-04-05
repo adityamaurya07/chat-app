@@ -4,9 +4,52 @@ import { parse } from "node:url";
 import next from "next";
 import { Server } from "socket.io";
 import { getToken } from "next-auth/jwt";
-import { PrismaClient } from "@prisma/client";
+import mongoose from "mongoose";
 
-const prisma = new PrismaClient();
+const mongoUri =
+  process.env.DATABASE_URL?.trim() || "mongodb://127.0.0.1:27017/chat-app";
+if (
+  !mongoUri.startsWith("mongodb://") &&
+  !mongoUri.startsWith("mongodb+srv://")
+) {
+  console.error(
+    "DATABASE_URL must be a MongoDB URI (mongodb:// or mongodb+srv://). SQLite file URLs are not supported.",
+  );
+  process.exit(1);
+}
+mongoose.set("strictQuery", false);
+await mongoose
+  .connect(mongoUri)
+  .catch((e) => console.error("Mongoose connect error", e));
+
+const { Schema, model } = mongoose;
+
+const FriendshipSchema = new Schema(
+  {
+    _id: String,
+    requesterId: String,
+    addresseeId: String,
+    status: String,
+    createdAt: Date,
+    updatedAt: Date,
+  },
+  { collection: "friendships", timestamps: false },
+);
+
+const MessageSchema = new Schema(
+  {
+    _id: String,
+    roomId: String,
+    userId: String,
+    userName: String,
+    content: String,
+    createdAt: Date,
+  },
+  { collection: "messages", timestamps: false },
+);
+
+const Friendship = model("Friendship", FriendshipSchema);
+const Message = model("Message", MessageSchema);
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "localhost";
 const port = parseInt(process.env.PORT || "3000", 10);
@@ -16,15 +59,13 @@ function dmRoom(a, b) {
 }
 
 async function areFriends(userIdA, userIdB) {
-  const f = await prisma.friendship.findFirst({
-    where: {
-      status: "ACCEPTED",
-      OR: [
-        { requesterId: userIdA, addresseeId: userIdB },
-        { requesterId: userIdB, addresseeId: userIdA },
-      ],
-    },
-  });
+  const f = await Friendship.findOne({
+    status: "ACCEPTED",
+    $or: [
+      { requesterId: userIdA, addresseeId: userIdB },
+      { requesterId: userIdB, addresseeId: userIdA },
+    ],
+  }).lean();
   return !!f;
 }
 
@@ -109,25 +150,27 @@ io.on("connection", (socket) => {
 
   socket.on("chat:send", async (payload) => {
     const peerId = payload?.peerId;
-    const content = String(payload?.content ?? "").trim().slice(0, 2000);
+    const content = String(payload?.content ?? "")
+      .trim()
+      .slice(0, 2000);
     if (!peerId || !content) return;
     if (!(await areFriends(uid, peerId))) return;
     const roomId = dmRoom(uid, peerId);
     try {
-      const msg = await prisma.message.create({
-        data: {
-          roomId: roomId,
-          userId: uid,
-          userName: socket.data.userName,
-          content,
-        },
+      const created = await Message.create({
+        _id: undefined,
+        roomId: roomId,
+        userId: uid,
+        userName: socket.data.userName,
+        content,
+        createdAt: new Date(),
       });
       io.to(roomId).emit("chat:message", {
-        id: msg.id,
-        userId: msg.userId,
-        userName: msg.userName,
-        content: msg.content,
-        createdAt: msg.createdAt.getTime(),
+        id: created._id?.toString(),
+        userId: created.userId,
+        userName: created.userName,
+        content: created.content,
+        createdAt: new Date(created.createdAt).getTime(),
         peerId: uid,
       });
     } catch (e) {

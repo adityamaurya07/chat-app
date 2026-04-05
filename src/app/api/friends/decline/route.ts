@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { connectDb, Friendship, jsonDbUnavailable } from "@/lib/db";
 import { z } from "zod";
 
 const bodySchema = z.object({
@@ -32,16 +32,23 @@ export async function POST(req: Request) {
 
   const { requesterId } = parsed.data;
 
-  const updated = await prisma.friendship.updateMany({
-    where: {
+  try {
+    await connectDb();
+  } catch (e) {
+    console.error("MongoDB connection failed:", e);
+    return jsonDbUnavailable(e);
+  }
+
+  const updated = await Friendship.updateMany(
+    {
       requesterId,
       addresseeId: me,
       status: "PENDING",
     },
-    data: { status: "DECLINED" },
-  });
+    { $set: { status: "DECLINED", updatedAt: new Date() } },
+  );
 
-  if (updated.count === 0) {
+  if (updated.modifiedCount === 0) {
     return Response.json({ error: "No pending request" }, { status: 404 });
   }
 

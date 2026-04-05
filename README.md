@@ -37,34 +37,25 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 ## Production database & deployment notes
 
-- This project uses Prisma. The local `DATABASE_URL` in `.env` points to `prisma/dev.db` (SQLite) for development. SQLite is not suitable for production on Vercel — the filesystem is ephemeral.
-- Provision a hosted database (examples: Vercel Postgres, Supabase, Neon, Railway, PlanetScale) and set `DATABASE_URL` in your Vercel project environment variables.
-- Ensure you add `AUTH_SECRET` and any other required env vars (e.g. `NEXTAUTH_URL` for explicit production origin) in Vercel.
+- The app uses **MongoDB** via **Mongoose**. Set `DATABASE_URL` to a MongoDB connection string (for example MongoDB Atlas, Railway, or self-hosted).
+- Add `AUTH_SECRET` and any other required env vars (for example `NEXTAUTH_URL` for an explicit production origin) in your host’s environment.
 
 Recommended deployment steps:
 
-1. In Vercel project settings, set `DATABASE_URL` to your production DB connection string and `AUTH_SECRET`.
-2. Run migrations and generate Prisma client on the production DB:
+1. Provision MongoDB and set `DATABASE_URL` and `AUTH_SECRET` in your project environment.
+2. If you have an old **SQLite** export (tables `users`, `friendships`, `messages`), copy it to `dev.db` in the project root (or set `SQLITE_PATH`), then run locally with `DATABASE_URL` pointing at your MongoDB:
 
 ```bash
-# Locally or in CI (must have DATABASE_URL set to the production DB):
-npx prisma migrate deploy
-npx prisma generate
-```
-
-3. If you want to copy data from your local SQLite `prisma/dev.db` to production, run the included migration script locally (set `DATABASE_URL` to the production DB first):
-
-```bash
-# install dependency for the migration script (native module)
-npm install --save better-sqlite3
-
-# set DATABASE_URL then run
-#$env:DATABASE_URL="postgresql://user:pass@host:5432/dbname"    # PowerShell
-node scripts/migrate-dev-to-prod.js
+npm install
+# PowerShell example:
+# $env:DATABASE_URL="mongodb://..."
+# $env:SQLITE_PATH="C:\path\to\legacy.db"   # optional
+npm run migrate:dev-to-mongo
+# or: node scripts/migrate-dev-to-prod.js
 ```
 
 Notes:
 
-- The migration script preserves ids and timestamps where possible. Review it in `scripts/migrate-dev-to-prod.js` and test on a non-production target first.
-- For serverless deployments, consider using Prisma Data Proxy or a serverless-friendly DB provider to avoid connection exhaustion.
+- Migration scripts preserve ids and timestamps where possible. Test on a non-production database first.
+- Mongoose opens one connection per Node process; use a connection pool limit appropriate for your host.
 - This repository includes `server.mjs` (a long-running Socket.IO server). Vercel does not support long-running servers — host that separately (Render, Railway, Fly, etc.) if you need WebSockets.

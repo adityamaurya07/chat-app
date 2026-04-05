@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { connectDb, Friendship, jsonDbUnavailable, User } from "@/lib/db";
+import mongoose from "mongoose";
 import { z } from "zod";
 
 const bodySchema = z.object({
@@ -35,21 +36,33 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid target" }, { status: 400 });
   }
 
-  const target = await prisma.user.findUnique({ where: { id: addresseeId } });
+  try {
+    await connectDb();
+  } catch (e) {
+    console.error("MongoDB connection failed:", e);
+    return jsonDbUnavailable(e);
+  }
+
+  const target = await User.findById(addresseeId).lean();
   if (!target) {
     return Response.json({ error: "User not found" }, { status: 404 });
   }
 
-  const reverse = await prisma.friendship.findUnique({
-    where: {
-      requesterId_addresseeId: { requesterId: addresseeId, addresseeId: me },
-    },
-  });
+  type FriendshipLean = {
+    _id: string;
+    requesterId: string;
+    addresseeId: string;
+    status: string;
+  };
+
+  const reverse = (await Friendship.findOne({
+    requesterId: addresseeId,
+    addresseeId: me,
+  }).lean()) as FriendshipLean | null;
 
   if (reverse?.status === "PENDING") {
-    await prisma.friendship.update({
-      where: { id: reverse.id },
-      data: { status: "ACCEPTED" },
+    await Friendship.findByIdAndUpdate(reverse._id, {
+      $set: { status: "ACCEPTED", updatedAt: new Date() },
     });
     emitDirectoryChanged();
     return Response.json({ ok: true, status: "accepted" });
@@ -59,11 +72,10 @@ export async function POST(req: Request) {
     return Response.json({ error: "Already friends" }, { status: 409 });
   }
 
-  const forward = await prisma.friendship.findUnique({
-    where: {
-      requesterId_addresseeId: { requesterId: me, addresseeId },
-    },
-  });
+  const forward = (await Friendship.findOne({
+    requesterId: me,
+    addresseeId,
+  }).lean()) as FriendshipLean | null;
 
   if (forward?.status === "ACCEPTED") {
     return Response.json({ error: "Already friends" }, { status: 409 });
@@ -73,20 +85,19 @@ export async function POST(req: Request) {
   }
 
   if (forward?.status === "DECLINED") {
-    await prisma.friendship.update({
-      where: { id: forward.id },
-      data: { status: "PENDING" },
+    await Friendship.findByIdAndUpdate(forward._id, {
+      $set: { status: "PENDING", updatedAt: new Date() },
     });
     emitDirectoryChanged();
     return Response.json({ ok: true, status: "requested" });
   }
 
-  await prisma.friendship.create({
-    data: {
-      requesterId: me,
-      addresseeId,
-      status: "PENDING",
-    },
+  const id = new mongoose.Types.ObjectId().toString();
+  await Friendship.create({
+    _id: id,
+    requesterId: me,
+    addresseeId,
+    status: "PENDING",
   });
   emitDirectoryChanged();
   return Response.json({ ok: true, status: "requested" });
